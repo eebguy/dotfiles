@@ -1,0 +1,22 @@
+# ls aliases
+
+alias ls='exa'
+alias ll='ls -l'
+alias la='ls -la'
+
+# git aliases
+alias g='git'
+alias gps='git push'
+alias gpl='git pull'
+alias gbv='git branch -vvv'
+alias gck='git checkout'
+alias gbc='git branch -c'
+alias gbd='git branch -D'
+
+# go aliases
+alias gomi='go mod init'
+alias gg='go get'
+alias gt='go test'
+
+# govulncheck aliases
+alias gvck='govulncheck ./...'
