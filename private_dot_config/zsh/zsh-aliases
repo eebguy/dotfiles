@@ -21,3 +21,6 @@ alias gt='go test'
 
 # govulncheck aliases
 alias gvck='govulncheck ./...'
+
+# kubectl aliases
+alias k='kubectl'
