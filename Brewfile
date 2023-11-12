@@ -3,7 +3,6 @@ brew "gcc"
 # Taps
 
 tap "homebrew/bundle"
-tap "homebrew/core"
 tap "homebrew/cask"
 tap "buo/cask-upgrade"
 tap "homebrew/cask-fonts"
