@@ -1,5 +1,6 @@
-# ls aliases
+alias vi='vim'
 
+# ls aliases
 alias ls='exa'
 alias ll='ls -l'
 alias la='ls -la'
