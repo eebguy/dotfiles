@@ -1,27 +1,47 @@
-alias vi='vim'
+alias vi='nvim'
 
 # ls aliases
-alias ls='exa'
+
+alias ls='eza'
 alias ll='ls -l'
 alias la='ls -la'
 alias tree='ll --tree'
 
 # git aliases
+
 alias g='git'
 alias gps='git push'
+alias gpsff='git push -ff'
 alias gpl='git pull'
 alias gbv='git branch -vvv'
-alias gck='git checkout'
 alias gbc='git branch -c'
 alias gbd='git branch -D'
+alias gck='git checkout'
+alias gckb='git checkout -b'
+alias gcm='git commit -m'
+alias gaa='git add .'
 
 # go aliases
-alias gomi='go mod init'
+
+alias gmi='go mod init'
 alias gg='go get'
 alias gt='go test'
 
 # govulncheck aliases
+
 alias gvck='govulncheck ./...'
 
 # kubectl aliases
+
 alias k='kubectl'
+
+# terraform aliases
+
+alias tf='terraform'
+alias tfi='terraform init'
+alias tfp='terraform plan'
+alias tfa='terraform apply'
+alias tfaa='terraform apply -auto-approve'
+alias tfd='terraform destroy'
+alias tfs='terraform state list'
+alias tft='terraform taint'

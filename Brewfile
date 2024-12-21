@@ -1,21 +1,20 @@
 brew "gcc"
 
-# Taps
-
 tap "homebrew/bundle"
+tap "homebrew/core"
 tap "homebrew/cask"
 tap "buo/cask-upgrade"
 tap "homebrew/cask-fonts"
 tap "homebrew/cask-versions"
 
+brew "brew-file"
 brew "mas"
-brew "zsh"
-brew "chezmoi"
 
-# Casks
+brew "zsh"
 
 cask 'font-fira-code'
-cask "powershell"
+
+brew "chezmoi"
 
 # Python & Dependencies
 
@@ -24,17 +23,21 @@ brew "readline"
 brew "sqlite3"
 brew "xz" 
 brew "zlib"
+
+
 brew "pyenv"  
+
 brew "awscli"
-brew "azure-cli"
+brew "azurecli"
 cask "google-cloud-sdk"
 brew "kubernetes-cli"
+brew "dapr/tap/dapr-cli"
 brew "minikube"
 brew "terraform"
 brew "tflint"
 brew "tfsec"
 brew "vault"
-brew "packer"
+
 brew "node"
 brew "helm"
 brew "gitlab-ci-local"
@@ -42,8 +45,10 @@ brew "git"
 brew "direnv"
 brew "eksctl"
 brew "argocd"
+brew "basilisk"
+cask "powershell"
 brew "go"
 brew "wget"
-brew "exa"
+brew "eza"
 brew "glab"
-brew "neovim"
+brew "neovim" 
