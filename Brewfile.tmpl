@@ -1,3 +1,4 @@
+{{ if eq .chezmoi.os "darwin" }}
 brew "gcc"
 
 tap "homebrew/bundle"
@@ -51,4 +52,5 @@ brew "go"
 brew "wget"
 brew "eza"
 brew "glab"
-brew "neovim" 
+brew "neovim"
+{{ end }}

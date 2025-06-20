@@ -3,8 +3,9 @@
 # ls aliases
 
 alias ls='eza'
-alias ll='ls -l'
-alias la='ls -la'
+alias lt='ls --icons'
+alias ll='lt -l'
+alias la='lt -la'
 alias tree='ll --tree'
 
 # git aliases

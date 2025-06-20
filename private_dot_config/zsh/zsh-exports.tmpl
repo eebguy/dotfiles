@@ -1,4 +1,6 @@
+{{ if eq .chezmoi.os "darwin" }}
 eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+{{ end }}
 
 # set nvim as my editor
 export EDITOR=nvim
@@ -9,6 +11,9 @@ export PATH=$PATH:/usr/local/go/bin
 # set GOPATH in my PATH
 export GOPATH=$HOME/go
 export PATH=$PATH:$GOPATH/bin
+
+# set GOROOT
+export GOROOT=/usr/local/bin
 
 # set adding local .bin to PATH
 export PATH=$PATH:$HOME/.local/bin
