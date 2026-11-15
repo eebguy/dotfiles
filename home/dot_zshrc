@@ -58,6 +58,6 @@ if (( $+commands[fzf] )); then
 fi
 
 # --- Aliases -----------------------------------------------------------------
-alias vim=nvim
-if (( $+commands[fdfind] )); then alias fd=fdfind; fi
-if (( $+commands[batcat] )); then alias bat=batcat; fi
+if [[ -r ${XDG_CONFIG_HOME:-$HOME/.config}/zsh/aliases.zsh ]]; then
+  source ${XDG_CONFIG_HOME:-$HOME/.config}/zsh/aliases.zsh
+fi
