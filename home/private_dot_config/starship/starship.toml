@@ -1,0 +1,30 @@
+format = """$hostname> $directory$git_branch$git_status$character"""
+
+# Adds schema support for editor autocompletion
+"$schema" = 'https://starship.rs/config-schema.json'
+
+# Inserts a blank line between shell prompts for readability
+add_newline = false
+
+palette = "nord"
+
+[palettes.nord]
+dark_blue = '#5E81AC'
+yellow = '#EBCB8B'
+
+[git_branch]
+format = '[$symbol$branch(:$remote_branch)]($style) '
+
+[hostname]
+ssh_only = false
+format = '[$ssh_symbol$hostname]($style)'
+
+[character]
+success_symbol = '[➜](bold green)'
+error_symbol = '[✗](bold red)'
+
+[directory]
+style = 'bold fg:dark_blue'
+format = '[$path ]($style)'
+truncation_length = 8
+truncate_to_repo = true

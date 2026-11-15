@@ -1,0 +1,8 @@
+#!/bin/sh
+# Re-runs install.sh's package step whenever packages.txt changes, so adding a line
+# and running `chezmoi apply` (or `chezmoi update` on another machine) installs it.
+# packages.txt hash: {{ joinPath .chezmoi.workingTree "packages.txt" | include | sha256sum }}
+
+# install.sh itself runs `chezmoi apply`; don't loop back into it.
+[ -n "${DOTFILES_BOOTSTRAP:-}" ] && exit 0
+exec sh {{ joinPath .chezmoi.workingTree "install.sh" | quote }} --packages-only

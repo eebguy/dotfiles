@@ -1,0 +1,4 @@
+# ~/.zprofile — macOS only (see .chezmoiignore).
+# /etc/zprofile runs path_helper after ~/.zshenv, pushing system dirs ahead of ours.
+# Re-read .zshenv so ~/.local/bin etc. win again.
+source $HOME/.zshenv

@@ -1,0 +1,8 @@
+# Git repos chezmoi clones and keeps updated (`chezmoi apply --refresh-externals` forces it).
+
+[".antidote"]
+    type = "git-repo"
+    url = "https://github.com/mattmc3/antidote.git"
+    refreshPeriod = "168h"
+    clone.args = ["--depth", "1"]
+    pull.args = ["--ff-only"]

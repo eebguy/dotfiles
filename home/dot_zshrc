@@ -1,0 +1,58 @@
+# ~/.zshrc — interactive shell config
+
+# --- History -----------------------------------------------------------------
+HISTFILE=$HOME/.zsh_history
+HISTSIZE=50000
+SAVEHIST=50000
+setopt extended_history        # save timestamps
+setopt hist_ignore_all_dups    # drop older duplicates
+setopt hist_ignore_space       # " cmd" is not saved
+setopt hist_reduce_blanks
+setopt share_history           # share across sessions/tmux panes
+
+# --- Shell options & keys ----------------------------------------------------
+setopt auto_cd interactive_comments
+bindkey -e
+autoload -Uz edit-command-line
+zle -N edit-command-line
+bindkey '^X^E' edit-command-line   # edit current command line in $EDITOR
+
+# --- Completion styles (compinit itself is run by ez-compinit) ---------------
+zstyle ':completion:*' matcher-list 'm:{a-z}={A-Za-z}'   # case-insensitive
+zstyle ':completion:*' menu no                           # fzf-tab takes over
+zstyle ':completion:*:descriptions' format '[%d]'
+zstyle ':completion:*' use-cache on
+zstyle ':completion:*' cache-path ${XDG_CACHE_HOME:-$HOME/.cache}/zsh/zcompcache
+
+# Use compinit -C against a cached dump (run `run-compinit -f` after adding completions)
+zstyle ':plugin:ez-compinit' 'use-cache' 'yes'
+
+# --- Plugins (antidote, static bundle) ---------------------------------------
+source ${ZDOTDIR:-$HOME}/.antidote/antidote.zsh
+zsh_plugins=${ZDOTDIR:-$HOME}/.zsh_plugins
+if [[ ! ${zsh_plugins}.zsh -nt ${zsh_plugins}.txt ]]; then
+  antidote bundle <${zsh_plugins}.txt >|${zsh_plugins}.zsh
+fi
+source ${zsh_plugins}.zsh
+
+# --- Prompt ------------------------------------------------------------------
+export STARSHIP_CONFIG=$HOME/.config/starship/starship.toml
+_evalcache starship init zsh
+
+# --- Tools (activate automatically once installed) ---------------------------
+if (( $+commands[zoxide] )); then
+  _evalcache zoxide init zsh        # z <dir>, zi = interactive
+fi
+
+if (( $+commands[fzf] )); then
+  source <(fzf --zsh)               # Ctrl-R history, Ctrl-T files, Alt-C dirs (fzf >= 0.48)
+  if (( $+commands[fdfind] )); then
+    export FZF_DEFAULT_COMMAND='fdfind --type f --hidden --exclude .git'
+    export FZF_CTRL_T_COMMAND=$FZF_DEFAULT_COMMAND
+  fi
+fi
+
+# --- Aliases -----------------------------------------------------------------
+alias vim=nvim
+if (( $+commands[fdfind] )); then alias fd=fdfind; fi
+if (( $+commands[batcat] )); then alias bat=batcat; fi
