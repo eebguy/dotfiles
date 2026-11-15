@@ -184,13 +184,20 @@ done
 PKG_FILE=${PKG_FILE:-$REPO_DIR/packages.txt}
 [ -f "$PKG_FILE" ] || die "missing $PKG_FILE"
 
-TMP=$(mktemp -d 2>/dev/null || mktemp -d -t dotfiles) || die "mktemp failed"
+# Scratch space lives on disk, not in /tmp: /tmp is often a small RAM disk (Raspberry Pi
+# OS, Fedora, Arch), and unpacked Go / gcloud / AWS CLI / HashiCorp downloads easily pass
+# 1-2 GB. Set TMPDIR to put it somewhere else. Each package gets its own download folder
+# ($TMP), deleted as soon as that package is done; $WORK holds logs and run state.
+WORK_BASE=${TMPDIR:-${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles}
+mkdir -p "$WORK_BASE" 2>/dev/null || die "can't create $WORK_BASE"
+WORK=$(mktemp -d "$WORK_BASE/run.XXXXXX") || die "mktemp failed in $WORK_BASE"
+TMP=$WORK
 MAIN_PID=$$ KEEPALIVE_PID="" START=$(now)
 cleanup() {
   [ -n "$TASK_PID" ] && kill "$TASK_PID" 2>/dev/null
   [ -n "$KEEPALIVE_PID" ] && kill "$KEEPALIVE_PID" 2>/dev/null
   [ "$FANCY" = 1 ] && printf '%s[?25h' "$ESC"     # make sure the cursor comes back
-  rm -rf "$TMP"
+  rm -rf "$WORK"
 }
 trap cleanup EXIT
 trap 'printf "\n\n  %s%s Interrupted%s\n\n" "$RED$BOLD" "$I_FAIL" "$RST"; exit 130' INT TERM
@@ -323,8 +330,8 @@ as_root() { [ "$PRIV" = granted ] && $SUDO "$@"; }
 
 # ======================================================== package manager ====
 pm_refresh() {
-  [ -f "$TMP/.pm-refreshed" ] && return 0
-  : >"$TMP/.pm-refreshed"
+  [ -f "$WORK/.pm-refreshed" ] && return 0
+  : >"$WORK/.pm-refreshed"
   case $PM in
     apt)    as_root apt-get update -qq ;;
     pacman) as_root pacman -Syu --noconfirm ;;   # Arch: never sync without upgrading
@@ -338,7 +345,7 @@ pm_refresh() {
 # Refreshes the index (once, if we have root) before giving up, e.g. on a fresh container.
 pm_has() {
   pm_search "$1" && return 0
-  [ ! -f "$TMP/.pm-refreshed" ] && [ "$PRIV" = granted ] && [ "$DRY_RUN" = 0 ] || return 1
+  [ ! -f "$WORK/.pm-refreshed" ] && [ "$PRIV" = granted ] && [ "$DRY_RUN" = 0 ] || return 1
   pm_refresh >/dev/null 2>&1 && pm_search "$1"
 }
 pm_search() {
@@ -564,7 +571,7 @@ vendor_maple_mono_nf() {
       "$reg" add 'HKCU\Software\Microsoft\Windows NT\CurrentVersion\Fonts' \
         /v "$n (TrueType)" /t REG_SZ /d "$(wslpath -w "$w/$n.ttf")" /f >/dev/null
     done
-    : >"$TMP/.font-windows"     # summary reminds you to restart Windows Terminal
+    : >"$WORK/.font-windows"     # summary reminds you to restart Windows Terminal
   fi
 }
 
@@ -598,12 +605,12 @@ ensure_base() {
   [ "$PM" = none ] && die "No supported package manager to install:$BASE_MISSING"
   elevate "install prerequisites with $(pm_label):$BASE_MISSING" ||
     die "Prerequisites missing:$BASE_MISSING — re-run and allow sudo, or install them yourself"
-  task "$TMP/base.log" "Refreshing $PM package index" pm_refresh || { fail "$PM refresh failed"; show_log "$TMP/base.log"; }
+  task "$WORK/base.log" "Refreshing $PM package index" pm_refresh || { fail "$PM refresh failed"; show_log "$WORK/base.log"; }
   # shellcheck disable=SC2086
-  if task "$TMP/base.log" "Installing$BASE_MISSING" pm_install $BASE_MISSING ca-certificates fontconfig; then
+  if task "$WORK/base.log" "Installing$BASE_MISSING" pm_install $BASE_MISSING ca-certificates fontconfig; then
     ok "Installed$BASE_MISSING"
   else
-    fail "Could not install prerequisites"; show_log "$TMP/base.log"; exit 1
+    fail "Could not install prerequisites"; show_log "$WORK/base.log"; exit 1
   fi
 }
 
@@ -680,11 +687,16 @@ pkg_line() {   # icon colour name detail [seconds]
   printf '  %s%s%s %-18s %s%s%s %s%s%s\n' "$2" "$1" "$RST" "$3" "$DIM" "$4" "$RST" "$DIM" "$p_t" "$RST"
 }
 
-mark_failed() {   # name logfile
+mark_failed() {   # name logfile [exit code]
   N_FAIL=$((N_FAIL + 1)); FAILED="$FAILED $1"
   if [ -s "$2" ]; then
     mkdir -p "$LOG_DIR" && cp "$2" "$LOG_DIR/$1.log" 2>/dev/null
     show_log "$2"
+  fi
+  # curl 23 = couldn't write, unzip 50 = disk full
+  if grep -qi 'no space left' "$2" 2>/dev/null || [ "${3:-}" = 23 ] || [ "${3:-}" = 50 ]; then
+    note "Looks like the disk filled up: $(free_space_h "$WORK") free in $WORK_BASE, $(free_space_h "$PREFIX") in $PREFIX"
+    DISK_FULL=1
   fi
 }
 
@@ -694,7 +706,7 @@ install_native() {   # name native
     N_NOROOT=$((N_NOROOT + 1)); NOROOT="$NOROOT $1"
     return
   fi
-  i_log="$TMP/$1.log" i_t0=$(now)
+  i_log="$WORK/$1.log" i_t0=$(now)
   if task "$i_log" "$1  installing with $PM" sh_pm_install "$2"; then
     pkg_line "$I_OK" "$GRN" "$1" "$PM: $2" $(($(now) - i_t0)); N_OK=$((N_OK + 1))
   else
@@ -702,6 +714,14 @@ install_native() {   # name native
   fi
 }
 sh_pm_install() { pm_refresh; pm_install "$@"; }
+
+# run_vendor <id> — run vendor_<id> with its own empty download folder in $TMP.
+# Callers delete "$WORK/dl-<id>" afterwards so disk use never piles up across packages.
+run_vendor() {
+  TMP="$WORK/dl-$1"
+  rm -rf "$TMP" && mkdir -p "$TMP"
+  "vendor_$1"
+}
 
 install_one() {   # name via cmd native
   name=$1 via=$2 cmd=$3 native=$4
@@ -725,8 +745,9 @@ install_one() {   # name via cmd native
   case $how in
     native) install_native "$name" "$native" ;;
     vendor)
-      i_log="$TMP/$name.log" i_t0=$(now)
-      task "$i_log" "$name  downloading upstream release" "vendor_$id"; rc=$?
+      i_log="$WORK/$name.log" i_t0=$(now)
+      task "$i_log" "$name  downloading upstream release" run_vendor "$id"; rc=$?
+      rm -rf "$WORK/dl-$id"
       if [ $rc -eq 0 ]; then
         pkg_line "$I_OK" "$GRN" "$name" "upstream" $(($(now) - i_t0)); N_OK=$((N_OK + 1))
       elif [ $rc -eq 3 ] && native_ok "$native"; then
@@ -736,12 +757,28 @@ install_one() {   # name via cmd native
         N_FAIL=$((N_FAIL + 1)); FAILED="$FAILED $name"
       else
         pkg_line "$I_FAIL" "$RED" "$name" "upstream install failed (exit $rc)" $(($(now) - i_t0))
-        mark_failed "$name" "$i_log"
+        mark_failed "$name" "$i_log" "$rc"
       fi ;;
     none)
       pkg_line "$I_FAIL" "$RED" "$name" "not in $PM and no upstream installer"
       N_FAIL=$((N_FAIL + 1)); FAILED="$FAILED $name" ;;
   esac
+}
+
+free_kb() { df -Pk "$1" 2>/dev/null | awk 'NR == 2 { print $4 }'; }
+free_space_h() {
+  f=$(free_kb "$1"); [ -n "$f" ] || { echo "?"; return; }
+  if [ "$f" -ge 1048576 ]; then awk -v k="$f" 'BEGIN { printf "%.1f GB", k / 1048576 }'
+  else echo "$((f / 1024)) MB"; fi
+}
+DISK_FULL=0
+check_disk() {   # the full package set needs ~3 GB in $PREFIX plus ~1 GB of scratch at peak
+  for d in "$PREFIX" "$WORK"; do
+    f=$(free_kb "$d"); [ -n "$f" ] || continue
+    if [ "$f" -lt 3145728 ]; then
+      warn "Only $(free_space_h "$d") free in $d — a full install needs about 3 GB"
+    fi
+  done
 }
 
 # What will need root? Collected before anything runs so there's one prompt, up front.
@@ -760,7 +797,7 @@ preflight() {
         native) p_list="$p_list $native" ;;
         auto)   if ! has_fn "vendor_$id" || pm_search "$native"; then p_list="$p_list $native"; fi ;;
       esac
-    done <"$TMP/manifest"
+    done <"$WORK/manifest"
     [ -n "$p_list" ] && set -- "$@" "install with $(pm_label):$p_list"
   fi
   if [ "$DO_DOTFILES" = 1 ] && [ "$DO_CHSH" = 1 ] && [ "$OS" = linux ]; then
@@ -785,8 +822,8 @@ preflight() {
 apply_dotfiles() {
   if ! command -v chezmoi >/dev/null 2>&1; then
     if [ "$DRY_RUN" = 1 ]; then skip "would install chezmoi first"; return; fi
-    task "$TMP/chezmoi.log" "Installing chezmoi" vendor_chezmoi ||
-      { fail "Could not install chezmoi"; show_log "$TMP/chezmoi.log"; exit 1; }
+    task "$WORK/chezmoi.log" "Installing chezmoi" run_vendor chezmoi ||
+      { fail "Could not install chezmoi"; show_log "$WORK/chezmoi.log"; exit 1; }
     ok "chezmoi installed"
   fi
   kv "Source" "$REPO_DIR"
@@ -859,9 +896,10 @@ summary() {
   [ -n "$NOROOT" ] && note "Needs root:$NOROOT — re-run and answer y to install them"
   if [ -n "$FAILED" ]; then
     note "Failed:$FAILED"
+    [ "$DISK_FULL" = 1 ] && note "Free up space (or set TMPDIR to a bigger disk), then re-run — finished packages are skipped"
     [ -d "$LOG_DIR" ] && note "Logs: $LOG_DIR"
   fi
-  [ -f "$TMP/.font-windows" ] && note "Maple Mono NF was installed for Windows — restart Windows Terminal and pick 'Maple Mono NF'"
+  [ -f "$WORK/.font-windows" ] && note "Maple Mono NF was installed for Windows — restart Windows Terminal and pick 'Maple Mono NF'"
   if [ "$DRY_RUN" = 1 ]; then
     printf '\n  %s%s Dry run complete — nothing was changed.%s\n\n' "$CYN$BOLD" "$I_DONE" "$RST"
   elif [ -n "$FAILED" ]; then
@@ -875,10 +913,10 @@ summary() {
 # =================================================================== main ====
 mkdir -p "$BIN" "$OPT"
 PATH="$BIN:$PATH"; export PATH
-parse_manifest >"$TMP/manifest"
+parse_manifest >"$WORK/manifest"
 if [ -n "$ONLY" ]; then
   for want in $(echo "$ONLY" | tr ',' ' '); do
-    grep -q "^$want " "$TMP/manifest" || die "--only: '$want' is not in packages.txt"
+    grep -q "^$want " "$WORK/manifest" || die "--only: '$want' is not in packages.txt"
   done
 fi
 
@@ -890,7 +928,7 @@ if [ "$LIST" = 1 ]; then
     [ "$how" = native ] && how="$PM ($native)"
     [ "$how" = vendor ] && how="upstream release"
     printf '  %s%s %-16s%s %s%-10s%s %-8s %s\n' "$sc" "$si" "$name" "$RST" "$sc" "$st" "$RST" "$via" "$how"
-  done <"$TMP/manifest"
+  done <"$WORK/manifest"
   echo
   exit 0
 fi
@@ -915,13 +953,14 @@ preflight
 
 if [ "$DO_PKGS" = 1 ]; then
   stage "$I_PREREQ" "$CYN" "Prerequisites"
+  check_disk
   ensure_base
 
   stage "$I_PKG" "$GRN" "Packages"
   while read -r name via cmd native; do
     selected "$name" || continue
     install_one "$name" "$via" "$cmd" "$native" </dev/null
-  done <"$TMP/manifest"
+  done <"$WORK/manifest"
 fi
 
 if [ "$DO_DOTFILES" = 1 ]; then
