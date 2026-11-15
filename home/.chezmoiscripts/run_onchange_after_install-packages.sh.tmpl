@@ -1,8 +1,14 @@
 #!/bin/sh
-# Re-runs install.sh's package step whenever packages.txt changes, so adding a line
+# Re-runs install.sh's package step only when packages.txt changes, so adding a line
 # and running `chezmoi apply` (or `chezmoi update` on another machine) installs it.
+# chezmoi re-runs a run_onchange_ script until it succeeds, so this always exits 0:
+# a package that fails is reported once instead of retried on every apply.
 # packages.txt hash: {{ joinPath .chezmoi.workingTree "packages.txt" | include | sha256sum }}
 
 # install.sh itself runs `chezmoi apply`; don't loop back into it.
 [ -n "${DOTFILES_BOOTSTRAP:-}" ] && exit 0
-exec sh {{ joinPath .chezmoi.workingTree "install.sh" | quote }} --packages-only
+
+sh {{ joinPath .chezmoi.workingTree "install.sh" | quote }} --packages-only && exit 0
+echo "chezmoi: some packages didn't install; re-run when ready:" >&2
+echo "  {{ joinPath .chezmoi.workingTree "install.sh" }} --packages-only" >&2
+exit 0
