@@ -26,8 +26,9 @@ format = '[$user]($style)'
 
 [hostname]
 ssh_only = false
-format = '[$hostname$ssh_symbol]($style)'
+format = '[$hostname$ssh_symbol]($style) '
 style = 'bold fg:m_red'
+ssh_symbol = '🌐'
 
 [character]
 success_symbol = '[➜](bold green)'
