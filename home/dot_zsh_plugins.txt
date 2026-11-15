@@ -9,8 +9,9 @@ zsh-users/zsh-completions kind:fpath path:src
 # Caches `eval "$(tool init zsh)"` output — provides _evalcache
 mroth/evalcache
 
-# Must load after compinit setup, before autosuggestions/highlighting
-Aloxaf/fzf-tab
+# Must load after compinit setup, before autosuggestions/highlighting.
+# Only when fzf is installed (has_fzf is defined in .zshrc) — without fzf it swallows Tab.
+Aloxaf/fzf-tab conditional:has_fzf
 
 zsh-users/zsh-autosuggestions
 

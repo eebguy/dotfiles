@@ -443,6 +443,14 @@ vendor_eza() {
   install -m 755 "$TMP/eza" "$BIN/eza"
 }
 
+vendor_fzf() {   # distro fzf is often too old for `fzf --zsh` (needs >= 0.48)
+  v=$(gh_latest_version junegunn/fzf)
+  [ -n "$v" ]
+  fetch "https://github.com/junegunn/fzf/releases/download/v$v/fzf-$v-${OS}_$ARCH.tar.gz" "$TMP/fzf.tgz"
+  tar -C "$TMP" -xzf "$TMP/fzf.tgz"
+  install -m 755 "$TMP/fzf" "$BIN/fzf"
+}
+
 vendor_kubernetes_cli() {
   v=$(fetch_text https://dl.k8s.io/release/stable.txt)
   fetch "https://dl.k8s.io/release/$v/bin/$OS/$ARCH/kubectl" "$TMP/kubectl"

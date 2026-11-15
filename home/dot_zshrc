@@ -19,7 +19,12 @@ bindkey '^X^E' edit-command-line   # edit current command line in $EDITOR
 
 # --- Completion styles (compinit itself is run by ez-compinit) ---------------
 zstyle ':completion:*' matcher-list 'm:{a-z}={A-Za-z}'   # case-insensitive
-zstyle ':completion:*' menu no                           # fzf-tab takes over
+has_fzf() { (( $+commands[fzf] )) }                      # gates fzf-tab in .zsh_plugins.txt
+if has_fzf; then
+  zstyle ':completion:*' menu no                         # fzf-tab draws the menu
+else
+  zstyle ':completion:*' menu select                     # built-in menu: Tab / arrows to pick
+fi
 zstyle ':completion:*:descriptions' format '[%d]'
 zstyle ':completion:*' use-cache on
 zstyle ':completion:*' cache-path ${XDG_CACHE_HOME:-$HOME/.cache}/zsh/zcompcache
