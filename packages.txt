@@ -28,6 +28,7 @@ openssl            via=native
 # --- core tools ------------------------------------------------------------
 chezmoi            via=vendor
 go                 via=vendor  apt=golang-go  dnf=golang  pacman=go  zypper=go  apk=go
+govulncheck        via=vendor  apt=-  dnf=-  pacman=-  zypper=-  apk=-  port=-
 neovim             via=vendor  cmd=nvim
 eza                via=vendor  port=eza
 starship           via=vendor

@@ -409,6 +409,14 @@ vendor_go() {
   ln -sf "$PREFIX/go/bin/gofmt" "$BIN/gofmt"
 }
 
+vendor_govulncheck() {   # built from source with Go (listed after go in packages.txt)
+  if ! command -v go >/dev/null 2>&1; then
+    echo "govulncheck needs Go — install the go package first" >&2
+    return 1
+  fi
+  env GOBIN="$BIN" go install golang.org/x/vuln/cmd/govulncheck@latest
+}
+
 vendor_chezmoi() {
   fetch https://get.chezmoi.io "$TMP/chezmoi.sh"
   sh "$TMP/chezmoi.sh" -b "$BIN"
