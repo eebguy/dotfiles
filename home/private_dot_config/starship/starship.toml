@@ -1,4 +1,4 @@
-format = """$hostname> $directory$git_branch$git_status$character"""
+format = """$username[@](bold fg:m_dark_blue)$hostname[>](bold fg:red) $directory$git_branch$git_status$character"""
 
 # Adds schema support for editor autocompletion
 "$schema" = 'https://starship.rs/config-schema.json'
@@ -6,25 +6,35 @@ format = """$hostname> $directory$git_branch$git_status$character"""
 # Inserts a blank line between shell prompts for readability
 add_newline = false
 
-palette = "nord"
+palette = "bmw"
 
-[palettes.nord]
-dark_blue = '#5E81AC'
-yellow = '#EBCB8B'
+[palettes.bmw]
+m_light_blue = '#81C4FF'
+m_dark_blue = '#16588E'
+m_red = '#E7222E'
+isle_of_man_green = '#164A3D'
+thundernight = '#3B2754'
 
 [git_branch]
 format = '[$symbol$branch(:$remote_branch)]($style) '
+style = 'bold fg:thundernight'
+
+[username]
+style_user = 'bold fg:m_light_blue'
+show_always = true
+format = '[$user]($style)'
 
 [hostname]
 ssh_only = false
 format = '[$ssh_symbol$hostname]($style)'
+style = 'bold fg:m_red'
 
 [character]
 success_symbol = '[➜](bold green)'
 error_symbol = '[✗](bold red)'
 
 [directory]
-style = 'bold fg:dark_blue'
+style = 'bold fg:isle_of_man_green'
 format = '[$path ]($style)'
 truncation_length = 8
 truncate_to_repo = true
