@@ -24,6 +24,7 @@
 git                via=native
 zsh                via=native
 openssl            via=native
+tmux               via=native
 
 # --- core tools ------------------------------------------------------------
 chezmoi            via=vendor
