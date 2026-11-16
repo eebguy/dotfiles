@@ -33,6 +33,7 @@ neovim             via=vendor  cmd=nvim
 eza                via=vendor  port=eza
 starship           via=vendor
 fzf                via=vendor
+zoxide             via=vendor
 maple-mono-nf      via=vendor  cmd=-  apt=-  dnf=-  pacman=-  zypper=-  apk=-  port=-
 
 # --- cloud & infrastructure -------------------------------------------------

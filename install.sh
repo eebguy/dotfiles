@@ -459,6 +459,16 @@ vendor_fzf() {   # distro fzf is often too old for `fzf --zsh` (needs >= 0.48)
   install -m 755 "$TMP/fzf" "$BIN/fzf"
 }
 
+vendor_zoxide() {   # static musl build, so one binary covers every Linux distro
+  v=$(gh_latest_version ajeetdsouza/zoxide)
+  [ -n "$v" ]
+  case $ARCH in amd64) a=x86_64 ;; arm64) a=aarch64 ;; *) return 3 ;; esac
+  case $OS in linux) t=$a-unknown-linux-musl ;; darwin) t=$a-apple-darwin ;; esac
+  fetch "https://github.com/ajeetdsouza/zoxide/releases/download/v$v/zoxide-$v-$t.tar.gz" "$TMP/zoxide.tgz"
+  tar -C "$TMP" -xzf "$TMP/zoxide.tgz"
+  install -m 755 "$TMP/zoxide" "$BIN/zoxide"
+}
+
 vendor_kubernetes_cli() {
   v=$(fetch_text https://dl.k8s.io/release/stable.txt)
   fetch "https://dl.k8s.io/release/$v/bin/$OS/$ARCH/kubectl" "$TMP/kubectl"
