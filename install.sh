@@ -459,14 +459,83 @@ vendor_fzf() {   # distro fzf is often too old for `fzf --zsh` (needs >= 0.48)
   install -m 755 "$TMP/fzf" "$BIN/fzf"
 }
 
-vendor_zoxide() {   # static musl build, so one binary covers every Linux distro
-  v=$(gh_latest_version ajeetdsouza/zoxide)
-  [ -n "$v" ]
-  case $ARCH in amd64) a=x86_64 ;; arm64) a=aarch64 ;; *) return 3 ;; esac
-  case $OS in linux) t=$a-unknown-linux-musl ;; darwin) t=$a-apple-darwin ;; esac
+# Rust tools publish static musl builds for Linux, so one download covers every distro.
+rust_triple() {
+  case $ARCH in amd64) a=x86_64 ;; arm64) a=aarch64 ;; *) return 1 ;; esac
+  case $OS in linux) echo "$a-unknown-linux-musl" ;; darwin) echo "$a-apple-darwin" ;; esac
+}
+
+vendor_zoxide() {
+  t=$(rust_triple) || return 3
+  v=$(gh_latest_version ajeetdsouza/zoxide); [ -n "$v" ]
   fetch "https://github.com/ajeetdsouza/zoxide/releases/download/v$v/zoxide-$v-$t.tar.gz" "$TMP/zoxide.tgz"
   tar -C "$TMP" -xzf "$TMP/zoxide.tgz"
   install -m 755 "$TMP/zoxide" "$BIN/zoxide"
+}
+
+vendor_ripgrep() {
+  t=$(rust_triple) || return 3
+  v=$(gh_latest_version BurntSushi/ripgrep); [ -n "$v" ]
+  fetch "https://github.com/BurntSushi/ripgrep/releases/download/$v/ripgrep-$v-$t.tar.gz" "$TMP/rg.tgz"
+  tar -C "$TMP" --strip-components=1 -xzf "$TMP/rg.tgz"
+  install -m 755 "$TMP/rg" "$BIN/rg"
+}
+
+vendor_fd() {
+  t=$(rust_triple) || return 3
+  v=$(gh_latest_version sharkdp/fd); [ -n "$v" ]
+  fetch "https://github.com/sharkdp/fd/releases/download/v$v/fd-v$v-$t.tar.gz" "$TMP/fd.tgz"
+  tar -C "$TMP" --strip-components=1 -xzf "$TMP/fd.tgz"
+  install -m 755 "$TMP/fd" "$BIN/fd"
+}
+
+vendor_tree_sitter_cli() {   # nvim-treesitter compiles its parsers with this
+  [ "$MUSL" = 1 ] && return 3
+  case $OS in linux) o=linux ;; darwin) o=macos ;; esac
+  case $ARCH in amd64) a=x64 ;; arm64) a=arm64 ;; esac
+  if [ "$OS" = linux ] && ! glibc_at_least 2.39; then   # upstream Linux builds need glibc 2.39+
+    build_tree_sitter_cli; return
+  fi
+  fetch "$(gh_asset tree-sitter/tree-sitter "tree-sitter-$o-$a.gz")" "$TMP/ts.gz"
+  gunzip -c "$TMP/ts.gz" >"$TMP/tree-sitter"
+  install -m 755 "$TMP/tree-sitter" "$BIN/tree-sitter"
+}
+glibc_at_least() {   # 2.39 -> true if this system's glibc is that new
+  g=$(getconf GNU_LIBC_VERSION 2>/dev/null | awk '{ print $2 }')
+  [ -n "$g" ] && awk -v have="$g" -v want="$1" 'BEGIN {
+    split(have, h, "."); split(want, w, ".")
+    exit !(h[1] > w[1] || (h[1] == w[1] && h[2] + 0 >= w[2] + 0)) }'
+}
+# Older distros (e.g. Ubuntu 22.04): compile it once with a throwaway Rust toolchain
+# that lives in the download folder and is deleted afterwards. Takes a few minutes.
+build_tree_sitter_cli() {
+  if command -v cargo >/dev/null 2>&1; then
+    cargo_bin=cargo
+  else
+    export RUSTUP_HOME="$TMP/rustup" CARGO_HOME="$TMP/cargo"
+    fetch https://sh.rustup.rs "$TMP/rustup-init.sh"
+    sh "$TMP/rustup-init.sh" -y -q --profile minimal --no-modify-path --default-toolchain stable
+    cargo_bin=$CARGO_HOME/bin/cargo
+  fi
+  "$cargo_bin" install tree-sitter-cli --locked --root "$TMP/ts-build"
+  install -m 755 "$TMP/ts-build/bin/tree-sitter" "$BIN/tree-sitter"
+}
+
+vendor_node() {   # current LTS; Neovim's bash and YAML language servers run on it
+  [ "$MUSL" = 1 ] && return 3                   # nodejs.org builds are glibc-only
+  v=$(fetch_text https://nodejs.org/dist/index.tab | awk -F'\t' 'NR > 1 && $10 != "-" { print $1; exit }')
+  [ -n "$v" ]
+  case $ARCH in amd64) a=x64 ;; arm64) a=arm64 ;; esac
+  fetch "https://nodejs.org/dist/$v/node-$v-$OS-$a.tar.gz" "$TMP/node.tgz"
+  rm -rf "$OPT/node" && mkdir -p "$OPT/node"
+  tar -C "$OPT/node" --strip-components=1 -xzf "$TMP/node.tgz"
+  for c in node npm npx; do ln -sf "$OPT/node/bin/$c" "$BIN/$c"; done
+}
+
+vendor_win32yank() {   # WSL: lets Neovim use the Windows clipboard
+  fetch "$(gh_asset equalsraf/win32yank win32yank-x64.zip)" "$TMP/w.zip"
+  unzip -oq "$TMP/w.zip" win32yank.exe -d "$TMP"
+  install -m 755 "$TMP/win32yank.exe" "$BIN/win32yank.exe"
 }
 
 vendor_kubernetes_cli() {
@@ -609,6 +678,11 @@ find_base_missing() {
   for c in curl git unzip tar gzip python3; do
     command -v $c >/dev/null 2>&1 || BASE_MISSING="$BASE_MISSING $c"
   done
+  # C compiler: Neovim's treesitter builds its syntax parsers with it
+  if ! command -v cc >/dev/null 2>&1 && ! command -v gcc >/dev/null 2>&1; then
+    BASE_MISSING="$BASE_MISSING gcc"
+    [ "$PM" = apk ] && BASE_MISSING="$BASE_MISSING musl-dev"
+  fi
 }
 
 ensure_base() {
@@ -624,7 +698,7 @@ ensure_base() {
   fi
   find_base_missing
   if [ -z "$BASE_MISSING" ]; then
-    ok "curl git unzip tar gzip python3"
+    ok "curl git unzip tar gzip python3 cc"
     return 0
   fi
   if [ "$DRY_RUN" = 1 ]; then skip "would install with $PM:$BASE_MISSING"; return 0; fi
@@ -650,17 +724,22 @@ parse_manifest() {
     set -- $line
     [ $# -eq 0 ] && continue
     name=$1; shift
-    via=auto cmd=$name native=$name
+    via=auto cmd=$name native=$name only=""
     for kv in "$@"; do
       k=${kv%%=*} v=${kv#*=}
       case $k in
         via) via=$v ;;
         cmd) cmd=$v ;;
+        only) only=$v ;;
         "$PM") native=$v ;;
         apt|dnf|yum|pacman|zypper|apk|port) ;;
         *) warn "packages.txt: unknown key '$k' for $name" >&2 ;;
       esac
     done
+    # only=linux,darwin,wsl: leave the package out entirely elsewhere
+    if [ -n "$only" ]; then
+      case ",$only," in *",$OS,"*) ;; *",wsl,"*) [ "$WSL" = 1 ] || continue ;; *) continue ;; esac
+    fi
     # yum distros use dnf names
     if [ "$PM" = yum ]; then
       for kv in "$@"; do case $kv in dnf=*) native=${kv#dnf=} ;; esac; done

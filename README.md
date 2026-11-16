@@ -35,12 +35,16 @@ running as root all work.
 Listed in [`packages.txt`](packages.txt), one per line — format is documented at the top.
 Each one is installed one of two ways:
 
-- **native** — the distro's package manager (`git`, `zsh`, `openssl`, anything you add by name).
+- **native** — the distro's package manager (`git`, `zsh`, `openssl`, `tmux`, anything you add by name).
 - **vendor** — the official upstream release into `~/.local` (no sudo, always current):
-  Go, Neovim, eza, chezmoi, starship, GitHub CLI, kubectl, Helm, Terraform, Vault,
-  Nomad, Consul, AWS CLI v2,
+  Go, govulncheck, Neovim, eza, chezmoi, starship, fzf, zoxide, ripgrep, fd, tree-sitter,
+  Node.js (LTS), GitHub CLI, kubectl, Helm, Terraform, Vault, Nomad, Consul, AWS CLI v2,
   Azure CLI (via `uv`), Google Cloud CLI, Maple Mono NF. On WSL the font is also
-  installed for Windows, since Windows Terminal renders with Windows fonts.
+  installed for Windows, since Windows Terminal renders with Windows fonts, and
+  `win32yank` gives Neovim the Windows clipboard.
+
+tree-sitter's Linux builds need glibc 2.39+; on older distros (Ubuntu 22.04) it is
+compiled from source once, with a temporary Rust toolchain that is deleted afterwards.
 
 To add a vendor package, write a `vendor_<name>` function in `install.sh`.
 Changing `packages.txt` then `chezmoi apply` installs the new entries automatically.
@@ -52,5 +56,17 @@ install.sh        bootstrap (POSIX sh)
 packages.txt      package list
 home/             chezmoi source state (.chezmoiroot points here)
 ```
+
+## Configs
+
+| Tool | Config | Notes |
+|---|---|---|
+| zsh | `~/.zshenv`, `~/.zshrc`, `~/.config/zsh/aliases.zsh` | antidote plugins, cached starship/zoxide init |
+| starship | `~/.config/starship/starship.toml` | BMW palette |
+| tmux | `~/.config/tmux/tmux.conf` | prefix `Ctrl-a`, `Ctrl-h/j/k/l` shared with Neovim |
+| Neovim | `~/.config/nvim/` | lazy.nvim; LSP for Go, Terraform, shell, YAML (Kubernetes), Lua, Markdown. `<Space>` shows the keymaps |
+
+On first start Neovim installs its plugins, syntax parsers and language servers by itself
+(give it a minute; `:Lazy` and `:Mason` show progress).
 
 Day to day: `chezmoi edit ~/.zshrc`, `chezmoi apply`, `chezmoi cd` → commit → push.

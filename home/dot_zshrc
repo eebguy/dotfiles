@@ -51,10 +51,13 @@ fi
 
 if (( $+commands[fzf] )); then
   source <(fzf --zsh)               # Ctrl-R history, Ctrl-T files, Alt-C dirs (fzf >= 0.48)
-  if (( $+commands[fdfind] )); then
-    export FZF_DEFAULT_COMMAND='fdfind --type f --hidden --exclude .git'
+  _fd=${commands[fd]:-${commands[fdfind]}}  # Debian/Ubuntu's own package calls it fdfind
+  if [[ -n $_fd ]]; then
+    export FZF_DEFAULT_COMMAND="${_fd:t} --type f --hidden --exclude .git"
     export FZF_CTRL_T_COMMAND=$FZF_DEFAULT_COMMAND
+    export FZF_ALT_C_COMMAND="${_fd:t} --type d --hidden --exclude .git"
   fi
+  unset _fd
 fi
 
 # --- Aliases -----------------------------------------------------------------

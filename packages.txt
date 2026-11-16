@@ -9,12 +9,13 @@
 #               where upstream has no build (eza on macOS, glibc-only builds on Alpine)
 #   via=native  system package manager only
 #   cmd=        command that shows it's already installed (default <name>; '-' = custom check)
+#   only=       install only on these platforms: linux, darwin, wsl (comma-separated)
 #   <pm>=       package name when it differs for apt, dnf, pacman, zypper, apk or port
 #               (MacPorts, used only if installed); '-' means "not available there"
 #
 # Adding something from your distro's repos is just a new line with its name, e.g.
-#   ripgrep     cmd=rg
-#   fd          cmd=fd  apt=fd-find
+#   jq
+#   htop
 #
 # Why the cloud/k8s tools and editors are via=vendor: distro repos lag badly
 # (Ubuntu 22.04 ships neovim 0.6, Go 1.18 and AWS CLI v1) and macOS has no
@@ -35,6 +36,8 @@ eza                via=vendor  port=eza
 starship           via=vendor
 fzf                via=vendor
 zoxide             via=vendor
+ripgrep            via=vendor  cmd=rg
+fd                 via=vendor  apt=fd-find
 maple-mono-nf      via=vendor  cmd=-  apt=-  dnf=-  pacman=-  zypper=-  apk=-  port=-
 
 # --- cloud & infrastructure -------------------------------------------------
@@ -49,4 +52,7 @@ nomad              via=vendor  apt=-  dnf=-  apk=-
 consul             via=vendor  apt=-  dnf=-  apk=-
 
 # --- development -------------------------------------------------------------
+tree-sitter-cli    via=vendor  cmd=tree-sitter  apt=-  dnf=-  zypper=-  pacman=tree-sitter-cli  apk=tree-sitter-cli  port=-
+node               via=vendor  apt=-  dnf=nodejs  pacman=nodejs  zypper=nodejs  apk=nodejs  port=nodejs22
+win32yank          via=vendor  only=wsl  cmd=win32yank.exe  apt=-  dnf=-  pacman=-  zypper=-  apk=-  port=-
 github-cli         via=vendor  cmd=gh  apt=gh  dnf=gh  pacman=github-cli  zypper=gh  apk=github-cli  port=gh
