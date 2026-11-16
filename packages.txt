@@ -4,27 +4,28 @@
 #
 #   via=auto    (default) search the system package manager; if it isn't there,
 #               fall back to an upstream installer (vendor_<name> in install.sh)
-#   via=vendor  always use the official upstream release, installed into ~/.local
-#               (current version, no sudo). Falls back to the package manager
-#               where upstream has no build (eza on macOS, glibc-only builds on Alpine)
-#   via=native  system package manager only
+#   via=vendor  on Linux, always use the official upstream release, installed into
+#               ~/.local (current version, no sudo). Falls back to the package manager
+#               where upstream has no build (glibc-only builds on Alpine).
+#               On macOS, Homebrew is current too, so it's tried first (same as auto)
+#   via=native  system package manager only (Homebrew on macOS)
 #   cmd=        command that shows it's already installed (default <name>; '-' = custom check)
 #   only=       install only on these platforms: linux, darwin, wsl (comma-separated)
-#   <pm>=       package name when it differs for apt, dnf, pacman, zypper, apk or port
-#               (MacPorts, used only if installed); '-' means "not available there"
+#   <pm>=       package name when it differs for apt, dnf, pacman, zypper, apk, brew
+#               (formula or cask; tap formulae as owner/tap/name) or port (MacPorts,
+#               used only with --no-brew); '-' means "not available there"
 #
 # Adding something from your distro's repos is just a new line with its name, e.g.
 #   jq
 #   htop
 #
 # Why the cloud/k8s tools and editors are via=vendor: distro repos lag badly
-# (Ubuntu 22.04 ships neovim 0.6, Go 1.18 and AWS CLI v1) and macOS has no
-# package manager here at all.
+# (Ubuntu 22.04 ships neovim 0.6, Go 1.18 and AWS CLI v1).
 
 # --- system (package manager) ----------------------------------------------
 git                via=native
 zsh                via=native
-openssl            via=native
+openssl            via=native  brew=openssl@3
 tmux               via=native
 
 # --- core tools ------------------------------------------------------------
@@ -38,21 +39,21 @@ fzf                via=vendor
 zoxide             via=vendor
 ripgrep            via=vendor  cmd=rg
 fd                 via=vendor  apt=fd-find
-maple-mono-nf      via=vendor  cmd=-  apt=-  dnf=-  pacman=-  zypper=-  apk=-  port=-
+maple-mono-nf      via=vendor  cmd=-  brew=font-maple-mono-nf  apt=-  dnf=-  pacman=-  zypper=-  apk=-  port=-
 
 # --- cloud & infrastructure -------------------------------------------------
 awscli             via=vendor  cmd=aws     apk=aws-cli  pacman=aws-cli-v2
-azurecli           via=vendor  cmd=az      apt=-  dnf=-  zypper=-  apk=-  pacman=azure-cli
-google-cloud-sdk   via=vendor  cmd=gcloud  apt=-  dnf=-  zypper=-  apk=-  pacman=-
+azurecli           via=vendor  cmd=az      brew=azure-cli  apt=-  dnf=-  zypper=-  apk=-  pacman=azure-cli
+google-cloud-sdk   via=vendor  cmd=gcloud  brew=gcloud-cli  apt=-  dnf=-  zypper=-  apk=-  pacman=-
 kubernetes-cli     via=vendor  cmd=kubectl apt=-  dnf=kubectl  pacman=kubectl  zypper=kubernetes-client  apk=kubectl  port=kubectl
 helm               via=vendor
-terraform          via=vendor  apt=-  dnf=-  apk=-
-vault              via=vendor  apt=-  dnf=-  apk=-
-nomad              via=vendor  apt=-  dnf=-  apk=-
-consul             via=vendor  apt=-  dnf=-  apk=-
+terraform          via=vendor  brew=hashicorp/tap/terraform  apt=-  dnf=-  apk=-
+vault              via=vendor  brew=hashicorp/tap/vault  apt=-  dnf=-  apk=-
+nomad              via=vendor  brew=hashicorp/tap/nomad  apt=-  dnf=-  apk=-
+consul             via=vendor  brew=hashicorp/tap/consul  apt=-  dnf=-  apk=-
 
 # --- development -------------------------------------------------------------
 tree-sitter-cli    via=vendor  cmd=tree-sitter  apt=-  dnf=-  zypper=-  pacman=tree-sitter-cli  apk=tree-sitter-cli  port=-
 node               via=vendor  apt=-  dnf=nodejs  pacman=nodejs  zypper=nodejs  apk=nodejs  port=nodejs22
 win32yank          via=vendor  only=wsl  cmd=win32yank.exe  apt=-  dnf=-  pacman=-  zypper=-  apk=-  port=-
-github-cli         via=vendor  cmd=gh  apt=gh  dnf=gh  pacman=github-cli  zypper=gh  apk=github-cli  port=gh
+github-cli         via=vendor  cmd=gh  brew=gh  apt=gh  dnf=gh  pacman=github-cli  zypper=gh  apk=github-cli  port=gh

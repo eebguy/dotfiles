@@ -1,7 +1,8 @@
 # dotfiles
 
 One script to set up a machine: installs my packages for whatever OS/distro it's on,
-then applies my configs with [chezmoi](https://chezmoi.io). No Homebrew.
+then applies my configs with [chezmoi](https://chezmoi.io). Homebrew on macOS only;
+Linux uses the distro's own package manager.
 
 ```sh
 git clone https://github.com/eebguy/dotfiles.git ~/.local/share/chezmoi
@@ -16,11 +17,21 @@ git clone https://github.com/eebguy/dotfiles.git ~/.local/share/chezmoi
 | `--upgrade` | reinstall upstream-release packages at their latest version |
 | `--yes` / `--no-sudo` | use sudo without asking (unattended) / never elevate |
 | `--packages-only` / `--dotfiles-only` | half the job |
+| `--no-brew` | macOS: skip Homebrew, upstream releases only |
 
 ## Supported
 
 macOS (Intel + Apple Silicon) · Debian/Ubuntu (apt) · Fedora/RHEL/Rocky/Amazon (dnf/yum) ·
 Arch (pacman) · openSUSE (zypper) · Alpine (apk) · WSL. amd64 and arm64.
+
+## macOS
+
+Homebrew does the installing. If it isn't there yet, the script installs it (that's the
+one step that needs sudo; answer no and it falls back to upstream releases), after the
+Xcode Command Line Tools. Every package comes from Homebrew where it has one, so
+`brew upgrade` keeps the Mac current; HashiCorp tools come from the `hashicorp/tap`,
+and the font, Azure CLI and Google Cloud CLI are casks. `.zshenv` puts Homebrew's
+`bin` and its zsh completions on the path.
 
 ## Sudo
 
@@ -33,7 +44,7 @@ running as root all work.
 ## Packages
 
 Listed in [`packages.txt`](packages.txt), one per line — format is documented at the top.
-Each one is installed one of two ways:
+On Linux each one is installed one of two ways (on macOS, Homebrew first — see above):
 
 - **native** — the distro's package manager (`git`, `zsh`, `openssl`, `tmux`, anything you add by name).
 - **vendor** — the official upstream release into `~/.local` (no sudo, always current):

@@ -10,6 +10,7 @@
 #   ./install.sh --only go,helm  just these packages (implies --packages-only)
 #   ./install.sh --upgrade       reinstall vendor packages at their latest release
 #   ./install.sh --yes           don't ask before using sudo (CI / unattended)
+#   ./install.sh --no-brew       macOS: skip Homebrew, use upstream releases only
 #   ./install.sh --help
 #
 # Run straight from GitHub (clones the repo first):
@@ -24,7 +25,7 @@ OPT=$PREFIX/opt
 LOG_DIR=${XDG_CACHE_HOME:-$HOME/.cache}/dotfiles/logs
 
 DRY_RUN=0 UPGRADE=0 ONLY="" DO_PKGS=1 DO_DOTFILES=1 DO_CHSH=1 LIST=0
-AUTO_YES=${DOTFILES_YES:-0} NO_SUDO=0
+AUTO_YES=${DOTFILES_YES:-0} NO_SUDO=0 NO_BREW=${DOTFILES_NO_BREW:-0}
 
 # ================================================================= output ====
 # Colour only on a real terminal, and never when NO_COLOR is set (no-color.org).
@@ -140,10 +141,12 @@ Options:
       --packages-only  skip chezmoi apply
       --dotfiles-only  skip package installs
       --no-chsh        don't change the login shell to zsh
+      --no-brew        macOS: don't use (or install) Homebrew
   -h, --help
 
 Environment: PREFIX (default ~/.local), DOTFILES_REPO, PKG_FILE,
-             DOTFILES_YES=1 (same as --yes), NO_COLOR=1 (plain output)
+             DOTFILES_YES=1 (same as --yes), DOTFILES_NO_BREW=1 (same as --no-brew),
+             NO_COLOR=1 (plain output)
 EOF
 }
 
@@ -175,6 +178,7 @@ while [ $# -gt 0 ]; do
     --packages-only) DO_DOTFILES=0 ;;
     --dotfiles-only) DO_PKGS=0 ;;
     --no-chsh)       DO_CHSH=0 ;;
+    --no-brew)       NO_BREW=1 ;;
     -h|--help)       usage; exit 0 ;;
     *)               die "unknown option: $1 (see --help)" ;;
   esac
@@ -227,10 +231,25 @@ else
   DISTRO=macos DISTRO_NAME="macOS $(sw_vers -productVersion 2>/dev/null)"
 fi
 
+# Homebrew lives in /opt/homebrew (Apple Silicon) or /usr/local (Intel), which may
+# not be on PATH yet in a fresh macOS shell.
+find_brew() {
+  for b in /opt/homebrew/bin/brew /usr/local/bin/brew "$(command -v brew 2>/dev/null)"; do
+    [ -n "$b" ] && [ -x "$b" ] && { echo "$b"; return 0; }
+  done
+  return 1
+}
+BREW=""
+[ "$OS" = darwin ] && BREW=$(find_brew)
+
 detect_pm() {
   if [ "$OS" = darwin ]; then
-    # No Homebrew. MacPorts is used only if you've installed it yourself.
-    if command -v port >/dev/null 2>&1; then echo port; else echo none; fi
+    # Homebrew, installed during Prerequisites if it's missing. --no-brew falls back to
+    # MacPorts if you have it, otherwise upstream releases only.
+    if [ "$NO_BREW" = 0 ]; then echo brew
+    elif command -v port >/dev/null 2>&1; then echo port
+    else echo none
+    fi
     return
   fi
   for id in $DISTRO $DISTRO_LIKE; do
@@ -337,8 +356,21 @@ pm_refresh() {
     pacman) as_root pacman -Syu --noconfirm ;;   # Arch: never sync without upgrading
     zypper) as_root zypper --non-interactive --quiet refresh ;;
     apk)    as_root apk update -q ;;
-    *)      : ;;
+    *)      : ;;   # brew: updated once in Prerequisites
   esac
+}
+
+# Homebrew installs as your user; every other package manager needs root.
+pm_needs_root() { case $PM in brew|none) return 1 ;; *) return 0 ;; esac; }
+
+# All formula and cask names, fetched once per run (brew info per package is slow).
+brew_has() {
+  case $1 in */*/*) return 0 ;; esac          # tap formula (hashicorp/tap/terraform): tapped on install
+  [ -n "$BREW" ] || return 0   # brew not installed yet (--list / --dry-run): trust packages.txt
+  if [ ! -s "$WORK/brew-names" ]; then
+    { "$BREW" formulae; "$BREW" casks; } >"$WORK/brew-names" 2>/dev/null
+  fi
+  grep -qx "$1" "$WORK/brew-names"
 }
 
 # pm_has <pkg> — does the package manager offer this package?
@@ -356,6 +388,7 @@ pm_search() {
     zypper)  zypper --non-interactive --quiet search --match-exact "$1" >/dev/null 2>&1 ;;
     apk)     [ -n "$(apk search -e "$1" 2>/dev/null)" ] ;;
     port)    port -q info "$1" >/dev/null 2>&1 ;;
+    brew)    brew_has "$1" ;;
     *)       return 1 ;;
   esac
 }
@@ -368,6 +401,7 @@ pm_install() {
     zypper)  as_root zypper --non-interactive --quiet install --no-recommends "$@" ;;
     apk)     as_root apk add -q "$@" ;;
     port)    as_root port -N install "$@" ;;
+    brew)    "$BREW" install --quiet "$@" ;;       # formulae and casks alike
     *)       return 1 ;;
   esac
 }
@@ -376,6 +410,7 @@ pm_label() {
   case $PM in
     pacman) echo "pacman (syncs and upgrades the system first: pacman -Syu)" ;;
     port)   echo "MacPorts" ;;
+    brew)   echo "Homebrew" ;;
     *)      echo "$PM" ;;
   esac
 }
@@ -689,12 +724,15 @@ ensure_base() {
   if [ "$OS" = darwin ]; then
     if xcode-select -p >/dev/null 2>&1; then
       ok "Xcode Command Line Tools $(xcode-select -p 2>/dev/null)"
-      return 0
+    elif [ "$DRY_RUN" = 1 ]; then
+      skip "would install Xcode Command Line Tools"
+    else
+      step "Opening the Xcode Command Line Tools installer (git, make, clang)"
+      xcode-select --install >/dev/null 2>&1 || true
+      die "Finish the Command Line Tools installer, then re-run ./install.sh"
     fi
-    [ "$DRY_RUN" = 1 ] && { skip "would install Xcode Command Line Tools"; return 0; }
-    step "Opening the Xcode Command Line Tools installer (git, make, clang)"
-    xcode-select --install >/dev/null 2>&1 || true
-    die "Finish the Command Line Tools installer, then re-run ./install.sh"
+    [ "$PM" = brew ] && ensure_brew
+    return 0
   fi
   find_base_missing
   if [ -z "$BASE_MISSING" ]; then
@@ -712,6 +750,39 @@ ensure_base() {
   else
     fail "Could not install prerequisites"; show_log "$WORK/base.log"; exit 1
   fi
+}
+
+# Install Homebrew if needed, then update it once for the run. If it can't be had
+# (sudo declined, installer failed) fall back to upstream releases instead of stopping.
+ensure_brew() {
+  if [ -z "$BREW" ]; then
+    if [ "$DRY_RUN" = 1 ]; then skip "would install Homebrew"; return 0; fi
+    if [ "$PRIV" != granted ]; then
+      warn "Homebrew needs sudo to install — using upstream releases instead"
+      brew_fallback; return 0
+    fi
+    if ! task "$WORK/brew.log" "Installing Homebrew" install_brew || ! BREW=$(find_brew); then
+      fail "Homebrew install failed — using upstream releases instead"; show_log "$WORK/brew.log"
+      brew_fallback; return 0
+    fi
+    ok "Homebrew installed ($BREW)"
+  else
+    ok "Homebrew $("$BREW" --version 2>/dev/null | head -n 1 | sed 's/^Homebrew //') ($BREW)"
+  fi
+  eval "$("$BREW" shellenv)"
+  export HOMEBREW_NO_ENV_HINTS=1
+  if [ "$DRY_RUN" = 0 ]; then
+    task "$WORK/brew-update.log" "Updating Homebrew" "$BREW" update --quiet ||
+      warn "brew update failed — installing from the current package index"
+    export HOMEBREW_NO_AUTO_UPDATE=1      # don't update again before every install
+  fi
+}
+install_brew() {
+  fetch https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh "$TMP/brew-install.sh"
+  NONINTERACTIVE=1 /bin/bash "$TMP/brew-install.sh"   # uses the sudo session from Privileges
+}
+brew_fallback() {
+  if command -v port >/dev/null 2>&1; then PM=port; else PM=none; fi
 }
 
 # =============================================================== manifest ====
@@ -732,7 +803,7 @@ parse_manifest() {
         cmd) cmd=$v ;;
         only) only=$v ;;
         "$PM") native=$v ;;
-        apt|dnf|yum|pacman|zypper|apk|port) ;;
+        apt|dnf|yum|pacman|zypper|apk|port|brew) ;;
         *) warn "packages.txt: unknown key '$k' for $name" >&2 ;;
       esac
     done
@@ -767,7 +838,11 @@ native_ok() { [ "$1" != - ] && [ "$PM" != none ] && pm_has "$1"; }
 # Only searches the package manager when the answer depends on it.
 plan_for() {   # name via native
   id=$(echo "$1" | tr '-' '_')
-  case $2 in
+  # On macOS, Homebrew is as current as upstream and `brew upgrade` keeps it that way,
+  # so vendor packages come from brew when it has them (upstream release otherwise).
+  p_via=$2
+  [ "$PM" = brew ] && [ "$p_via" = vendor ] && p_via=auto
+  case $p_via in
     native) if native_ok "$3"; then echo native; else echo none; fi ;;
     vendor) if has_fn "vendor_$id"; then echo vendor
             elif native_ok "$3"; then echo native; else echo none; fi ;;
@@ -806,7 +881,7 @@ mark_failed() {   # name logfile [exit code]
 }
 
 install_native() {   # name native
-  if ! elevate "install $2 with $(pm_label)"; then
+  if pm_needs_root && ! elevate "install $2 with $(pm_label)"; then
     pkg_line "$I_WARN" "$YLW" "$1" "needs root to install with $PM — skipped"
     N_NOROOT=$((N_NOROOT + 1)); NOROOT="$NOROOT $1"
     return
@@ -841,7 +916,7 @@ install_one() {   # name via cmd native
   if [ "$DRY_RUN" = 1 ]; then
     case $how in
       vendor) pkg_line "$I_RUN" "$CYN" "$name" "would install the upstream release" ;;
-      native) pkg_line "$I_RUN" "$CYN" "$name" "would install '$native' with $PM (needs root)" ;;
+      native) pkg_line "$I_RUN" "$CYN" "$name" "would install '$native' with $PM$(pm_needs_root && echo ' (needs root)')" ;;
       none)   pkg_line "$I_WARN" "$YLW" "$name" "no installer available on $DISTRO/$PM" ;;
     esac
     return
@@ -891,7 +966,9 @@ preflight() {
   set --
   find_base_missing
   [ -n "$BASE_MISSING" ] && set -- "$@" "install prerequisites with $(pm_label):$BASE_MISSING"
-  if [ "$DO_PKGS" = 1 ]; then
+  [ "$DO_PKGS" = 1 ] && [ "$PM" = brew ] && [ -z "$BREW" ] &&
+    set -- "$@" "install Homebrew (it creates $( [ "$ARCH" = arm64 ] && echo /opt/homebrew || echo /usr/local ))"
+  if [ "$DO_PKGS" = 1 ] && pm_needs_root; then
     p_list=""
     while read -r name via cmd native; do
       selected "$name" || continue
@@ -1030,7 +1107,7 @@ if [ "$LIST" = 1 ]; then
   while read -r name via cmd native; do
     if is_installed "$name" "$cmd"; then st="installed" sc=$GRN si=$I_OK; else st="missing" sc=$YLW si=$I_SKIP; fi
     how=$(plan_for "$name" "$via" "$native")
-    [ "$how" = native ] && how="$PM ($native)"
+    [ "$how" = native ] && how="$( [ "$PM" = brew ] && echo Homebrew || echo "$PM") ($native)"
     [ "$how" = vendor ] && how="upstream release"
     printf '  %s%s %-16s%s %s%-10s%s %-8s %s\n' "$sc" "$si" "$name" "$RST" "$sc" "$st" "$RST" "$via" "$how"
   done <"$WORK/manifest"
@@ -1048,7 +1125,11 @@ banner
 stage "$I_PLATFORM" "$BLU" "Platform"
 kv "System" "${DISTRO_NAME:-$OS}$( [ $WSL = 1 ] && echo ' (WSL)')$( [ $MUSL = 1 ] && echo ' (musl)')"
 kv "Architecture" "$ARCH"
-kv "Packages" "$( [ "$PM" = none ] && echo 'none (upstream releases only)' || echo "$PM")"
+case $PM in
+  none) kv "Packages" "none (upstream releases only)" ;;
+  brew) kv "Packages" "Homebrew$( [ -z "$BREW" ] && echo ' (installed in Prerequisites)')" ;;
+  *)    kv "Packages" "$PM" ;;
+esac
 kv "Install dir" "$PREFIX"
 if [ "$PRIV" = granted ]; then kv "User" "root"; else kv "User" "$(id -un)${SUDO_BIN:+ ($SUDO_BIN available)}"; fi
 [ "$DRY_RUN" = 1 ] && kv "Mode" "${YLW}dry run — nothing will be changed${RST}"

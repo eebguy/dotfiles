@@ -1,3 +1,4 @@
+{{- $brew := "/usr/local" }}{{ if eq .chezmoi.arch "arm64" }}{{ $brew = "/opt/homebrew" }}{{ end -}}
 # ~/.zshenv — read by every zsh (interactive or not). Keep it tiny.
 # Managed by chezmoi: edit with `chezmoi edit ~/.zshenv`.
 
@@ -13,8 +14,14 @@ path=(
   $HOME/.local/bin                       # install.sh vendor installs
   $HOME/go/bin                           # go install
   /usr/local/go/bin                      # system Go tarball (must precede /usr/local/bin)
+{{- if eq .chezmoi.os "darwin" }}
+  {{ $brew }}/bin {{ $brew }}/sbin        # Homebrew (what `brew shellenv` adds, without the fork)
+{{- end }}
   $path
 )
+{{- if eq .chezmoi.os "darwin" }}
+fpath=({{ $brew }}/share/zsh/site-functions $fpath)   # completions shipped by brew packages
+{{- end }}
 {{- if and (eq .chezmoi.os "linux") (.chezmoi.kernel.osrelease | lower | contains "microsoft") }}
 
 # WSL: appendWindowsPath=false in /etc/wsl.conf; add back only what's used from Linux.
