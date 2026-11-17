@@ -40,6 +40,9 @@ if [[ ! ${zsh_plugins}.zsh -nt ${zsh_plugins}.txt ]]; then
 fi
 source ${zsh_plugins}.zsh
 
+# Tab completion for kubectl, helm, gh, terraform, aws, az, gcloud, ... (cached)
+source ${XDG_CONFIG_HOME:-$HOME/.config}/zsh/completions.zsh
+
 # --- Prompt ------------------------------------------------------------------
 export STARSHIP_CONFIG=$HOME/.config/starship/starship.toml
 _evalcache starship init zsh
@@ -64,3 +67,12 @@ fi
 if [[ -r ${XDG_CONFIG_HOME:-$HOME/.config}/zsh/aliases.zsh ]]; then
   source ${XDG_CONFIG_HOME:-$HOME/.config}/zsh/aliases.zsh
 fi
+
+# --- Tmux Attach -------------------------------------------------------------
+if (( $+commands[tmux] )); then
+  tmux attach
+else
+  echo "tmux not available - not attached."
+fi
+
+bindkey -s ^f "tmux-sessionizer\n"

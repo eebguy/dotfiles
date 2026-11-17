@@ -646,9 +646,18 @@ ensure_uv() {
 }
 
 vendor_azurecli() {
-  # Microsoft's pip-based install, isolated in its own venv by uv.
+  # Microsoft's own method: a private venv + pip. Not `uv tool install`: azure-cli pins
+  # pre-release Azure SDKs (azure-batch==15.0.0b1, ...), which uv's resolver refuses in
+  # dependencies, so it silently falls back to azure-cli 2.0.67 from 2019. pip accepts
+  # exact pre-release pins. uv still supplies the Python.
   ensure_uv
-  env UV_TOOL_BIN_DIR="$BIN" uv tool install --quiet --force --python 3.12 azure-cli
+  uv tool uninstall azure-cli >/dev/null 2>&1 || true    # older installs of this script
+  rm -rf "$OPT/azure-cli"
+  uv venv --quiet --seed --python 3.12 "$OPT/azure-cli"
+  "$OPT/azure-cli/bin/python" -m pip install --quiet --disable-pip-version-check azure-cli
+  rm -f "$BIN/az"
+  printf '#!/bin/sh\nexec "%s" -Im azure.cli "$@"\n' "$OPT/azure-cli/bin/python" >"$BIN/az"
+  chmod 755 "$BIN/az"
 }
 
 vendor_google_cloud_sdk() {

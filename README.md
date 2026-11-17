@@ -73,6 +73,7 @@ home/             chezmoi source state (.chezmoiroot points here)
 | Tool | Config | Notes |
 |---|---|---|
 | zsh | `~/.zshenv`, `~/.zshrc`, `~/.config/zsh/aliases.zsh` | antidote plugins, cached starship/zoxide init |
+| Tab completion | `~/.config/zsh/completions.zsh`, `~/.config/zsh/functions/` | kubectl, helm, gh, chezmoi, rg, fd, uv, terraform, vault, nomad, consul, aws, az, gcloud; generated files cached in `~/.cache/zsh/completions`, rebuilt when a tool is upgraded |
 | starship | `~/.config/starship/starship.toml` | BMW palette |
 | tmux | `~/.config/tmux/tmux.conf` | prefix `Ctrl-a`, `Ctrl-h/j/k/l` shared with Neovim |
 | Neovim | `~/.config/nvim/` | lazy.nvim; LSP for Go, Terraform, shell, YAML (Kubernetes), Lua, Markdown. `<Space>` shows the keymaps |
